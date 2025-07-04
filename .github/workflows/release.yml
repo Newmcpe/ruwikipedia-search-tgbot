@@ -1,0 +1,95 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    
+    steps:
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        body: |
+          Автоматический релиз Wiki Article Finder Telegram Bot
+          
+          ## Изменения
+          - Обновления и исправления ошибок
+          - Оптимизированные запросы к Wikipedia API
+          
+          ## Установка
+          1. Скачайте бинарный файл для вашей системы
+          2. Сделайте файл исполняемым: `chmod +x wiki-article-finder-telegram`
+          3. Создайте `.env` файл с `BOT_TOKEN=ваш_токен`
+          4. Запустите: `./wiki-article-finder-telegram`
+        draft: false
+        prerelease: false
+
+  build-release:
+    needs: create-release
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        target: [x86_64-unknown-linux-gnu, x86_64-unknown-linux-musl]
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: wiki-article-finder-telegram
+            asset_name: wiki-article-finder-telegram-linux-x86_64
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            artifact_name: wiki-article-finder-telegram
+            asset_name: wiki-article-finder-telegram-linux-x86_64-musl
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+
+    - name: Install musl tools
+      if: matrix.target == 'x86_64-unknown-linux-musl'
+      run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+    - name: Cache Cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Build release binary
+      run: cargo build --release --target ${{ matrix.target }}
+
+    - name: Strip binary
+      run: strip target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+        asset_name: ${{ matrix.asset_name }}
+        asset_content_type: application/octet-stream 
