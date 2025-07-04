@@ -1,0 +1,81 @@
+# Rust build artifacts
+target/
+Cargo.lock  # Keep this for applications, ignore for libraries
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Rust-specific temporary files
+*.pdb
+*.orig
+*.rej
+*.bk
+
+# Log files
+*.log
+logs/
+
+# Environment and configuration files
+.env
+.env.local
+.env.production
+.env.test
+
+# Coverage reports
+coverage/
+tarpaulin-report.html
+cobertura.xml
+lcov.info
+
+# Benchmark results
+criterion/
+bench_results/
+
+# Documentation build artifacts
+book/
+docs/_build/
+target/doc/
+
+# Flamegraph profiling
+flamegraph.svg
+perf.data*
+
+# OS-specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary and cache directories
+tmp/
+temp/
+cache/
+.cache/
+
+# Lock files for other package managers (if used alongside Rust)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Binary executables (adjust as needed for your project)
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+tests/fixtures/temp/
+test_output/
+
+# Backup files
+*.backup
+*.bak 
