@@ -9,6 +9,128 @@ pub struct WikipediaSearchItem {
     pub pageid: Option<u64>,
 }
 
+// Структура для батчевого получения информации о статьях
+#[derive(Debug)]
+pub struct ArticleBatchInfo {
+    pub image_url: Option<String>,
+    pub extract: Option<String>,
+    pub wikidata_id: Option<String>,
+}
+
+// Оптимизированная функция для получения всех данных о статьях одним запросом
+pub async fn get_articles_batch_info(
+    pageids: Vec<u64>,
+) -> Result<std::collections::HashMap<u64, ArticleBatchInfo>, Box<dyn Error + Send + Sync>> {
+    let client = reqwest::Client::new();
+
+    // Создаем строку с ID статей для запроса
+    let pageids_str = pageids
+        .iter()
+        .map(|id| id.to_string())
+        .collect::<Vec<_>>()
+        .join("|");
+
+    // Объединенный запрос для получения изображений, выдержек и свойств страниц
+    let batch_url = format!(
+        "https://ru.wikipedia.org/w/api.php?action=query&pageids={}&format=json&prop=pageimages|extracts|pageprops&piprop=thumbnail&pithumbsize=300&exintro=1&explaintext=1&ppprop=wikibase_item",
+        urlencoding::encode(&pageids_str)
+    );
+
+    let response = client
+        .get(&batch_url)
+        .header("User-Agent", "WikiArticleFinderBot/1.0")
+        .send()
+        .await?;
+
+    let batch_result: serde_json::Value = response.json().await?;
+    let mut results = std::collections::HashMap::new();
+
+    if let Some(query) = batch_result.get("query").and_then(|q| q.as_object()) {
+        if let Some(pages) = query.get("pages").and_then(|p| p.as_object()) {
+            for (page_id_str, page_data) in pages {
+                if let Ok(page_id) = page_id_str.parse::<u64>() {
+                    let image_url = page_data
+                        .get("thumbnail")
+                        .and_then(|t| t.as_object())
+                        .and_then(|thumb| thumb.get("source"))
+                        .and_then(|s| s.as_str())
+                        .map(|s| s.to_string());
+
+                    let extract = page_data
+                        .get("extract")
+                        .and_then(|e| e.as_str())
+                        .map(|s| s.to_string());
+
+                    let wikidata_id = page_data
+                        .get("pageprops")
+                        .and_then(|pp| pp.as_object())
+                        .and_then(|props| props.get("wikibase_item"))
+                        .and_then(|wi| wi.as_str())
+                        .map(|s| s.to_string());
+
+                    results.insert(
+                        page_id,
+                        ArticleBatchInfo {
+                            image_url,
+                            extract,
+                            wikidata_id,
+                        },
+                    );
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+// Оптимизированная функция для получения описаний из Wikidata батчем
+pub async fn get_wikidata_descriptions_batch(
+    wikidata_ids: Vec<String>,
+) -> Result<std::collections::HashMap<String, String>, Box<dyn Error + Send + Sync>> {
+    if wikidata_ids.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+
+    let client = reqwest::Client::new();
+    let ids_str = wikidata_ids.join("|");
+
+    let description_url = format!(
+        "https://www.wikidata.org/w/api.php?action=wbgetentities&ids={}&format=json&props=descriptions&languages=ru",
+        urlencoding::encode(&ids_str)
+    );
+
+    let response = client
+        .get(&description_url)
+        .header("User-Agent", "WikiArticleFinderBot/1.0")
+        .send()
+        .await?;
+
+    let description_result: serde_json::Value = response.json().await?;
+    let mut results = std::collections::HashMap::new();
+
+    if let Some(entities) = description_result
+        .get("entities")
+        .and_then(|e| e.as_object())
+    {
+        for (wikidata_id, entity_data) in entities {
+            let description = entity_data
+                .get("descriptions")
+                .and_then(|d| d.as_object())
+                .and_then(|descriptions| descriptions.get("ru"))
+                .and_then(|ru| ru.as_object())
+                .and_then(|ru_desc| ru_desc.get("value"))
+                .and_then(|v| v.as_str());
+
+            if let Some(desc) = description {
+                results.insert(wikidata_id.clone(), desc.to_string());
+            }
+        }
+    }
+
+    Ok(results)
+}
+
 // Функция для поиска статей в русской Википедии
 pub async fn search_wikipedia(
     query: &str,
@@ -52,85 +174,7 @@ pub async fn search_wikipedia(
     Ok(results)
 }
 
-// Функция для получения изображения статьи
-pub async fn get_article_image(
-    pageid: u64,
-) -> Result<Option<String>, Box<dyn Error + Send + Sync>> {
-    let client = reqwest::Client::new();
-
-    let image_url = format!(
-        "https://ru.wikipedia.org/w/api.php?action=query&pageids={}&format=json&prop=pageimages&piprop=thumbnail&pithumbsize=300",
-        pageid
-    );
-
-    let response = client
-        .get(&image_url)
-        .header("User-Agent", "WikiArticleFinderBot/1.0")
-        .send()
-        .await?;
-
-    let image_result: serde_json::Value = response.json().await?;
-
-    if let Some(query) = image_result.get("query").and_then(|q| q.as_object()) {
-        if let Some(pages) = query.get("pages").and_then(|p| p.as_object()) {
-            if let Some(page) = pages.values().next() {
-                if let Some(thumbnail) = page.get("thumbnail").and_then(|t| t.as_object()) {
-                    if let Some(source) = thumbnail.get("source").and_then(|s| s.as_str()) {
-                        return Ok(Some(source.to_string()));
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(None)
-}
-
-// Функция для получения краткого описания статьи
-pub async fn get_article_extract(
-    pageid: u64,
-) -> Result<Option<String>, Box<dyn Error + Send + Sync>> {
-    let client = reqwest::Client::new();
-
-    let extract_url = format!(
-        "https://ru.wikipedia.org/w/api.php?action=query&pageids={}&format=json&prop=extracts&exintro=1&explaintext=1",
-        pageid
-    );
-
-    let response = client
-        .get(&extract_url)
-        .header("User-Agent", "WikiArticleFinderBot/1.0")
-        .send()
-        .await?;
-
-    let extract_result: serde_json::Value = response.json().await?;
-
-    if let Some(query) = extract_result.get("query").and_then(|q| q.as_object()) {
-        if let Some(pages) = query.get("pages").and_then(|p| p.as_object()) {
-            if let Some(page) = pages.values().next() {
-                if let Some(extract) = page.get("extract").and_then(|e| e.as_str()) {
-                    return Ok(Some(extract.to_string()));
-                }
-            }
-        }
-    }
-
-    Ok(None)
-}
-
-// Функция для получения изображения и краткого описания статьи
-pub async fn get_article_details(
-    pageid: u64,
-) -> Result<(Option<String>, Option<String>), Box<dyn Error + Send + Sync>> {
-    // Получаем изображение и описание параллельно
-    let (image_result, extract_result) =
-        tokio::join!(get_article_image(pageid), get_article_extract(pageid));
-
-    let image_url = image_result?;
-    let extract = extract_result?;
-
-    Ok((image_url, extract))
-}
+// Эти функции заменены на более эффективные батчевые запросы выше
 
 // Функция для получения полного URL статьи
 pub fn get_article_url(title: &str) -> String {
@@ -193,83 +237,7 @@ pub fn escape_markdown_url(url: &str) -> String {
         .collect()
 }
 
-// Функция для получения Wikidata ID из Wikipedia статьи
-pub async fn get_wikidata_id(pageid: u64) -> Result<Option<String>, Box<dyn Error + Send + Sync>> {
-    let client = reqwest::Client::new();
-
-    let wikidata_url = format!(
-        "https://ru.wikipedia.org/w/api.php?action=query&pageids={}&format=json&prop=pageprops&ppprop=wikibase_item",
-        pageid
-    );
-
-    let response = client
-        .get(&wikidata_url)
-        .header("User-Agent", "WikiArticleFinderBot/1.0")
-        .send()
-        .await?;
-
-    let wikidata_result: serde_json::Value = response.json().await?;
-
-    if let Some(query) = wikidata_result.get("query").and_then(|q| q.as_object()) {
-        if let Some(pages) = query.get("pages").and_then(|p| p.as_object()) {
-            if let Some(page) = pages.values().next() {
-                if let Some(pageprops) = page.get("pageprops").and_then(|pp| pp.as_object()) {
-                    if let Some(wikibase_item) =
-                        pageprops.get("wikibase_item").and_then(|wi| wi.as_str())
-                    {
-                        return Ok(Some(wikibase_item.to_string()));
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(None)
-}
-
-// Функция для получения описания из Wikidata
-pub async fn get_wikidata_description(
-    wikidata_id: &str,
-) -> Result<Option<String>, Box<dyn Error + Send + Sync>> {
-    let client = reqwest::Client::new();
-
-    let description_url = format!(
-        "https://www.wikidata.org/w/api.php?action=wbgetentities&ids={}&format=json&props=descriptions&languages=ru",
-        wikidata_id
-    );
-
-    let response = client
-        .get(&description_url)
-        .header("User-Agent", "WikiArticleFinderBot/1.0")
-        .send()
-        .await?;
-
-    let description_result: serde_json::Value = response.json().await?;
-
-    let description = description_result
-        .get("entities")
-        .and_then(|e| e.as_object())
-        .and_then(|entities| entities.get(wikidata_id))
-        .and_then(|entity| entity.get("descriptions").and_then(|d| d.as_object()))
-        .and_then(|descriptions| descriptions.get("ru").and_then(|ru| ru.as_object()))
-        .and_then(|ru_desc| ru_desc.get("value").and_then(|v| v.as_str()));
-
-    match description {
-        Some(value) => Ok(Some(value.to_string())),
-        None => Ok(None),
-    }
-}
-
-// Функция для получения описания из Wikidata через pageid
-pub async fn get_wikidata_description_by_pageid(
-    pageid: u64,
-) -> Result<Option<String>, Box<dyn Error + Send + Sync>> {
-    if let Some(wikidata_id) = get_wikidata_id(pageid).await? {
-        get_wikidata_description(&wikidata_id).await
-    } else {
-        Ok(None)
-    }
-}
+// Эти функции заменены на более эффективный батчевый запрос get_wikidata_descriptions_batch выше
 
 // Функция для очистки описаний от ссылок
 pub fn clean_description(text: &str) -> String {
