@@ -2,6 +2,10 @@
 name = "wiki-article-finder-telegram"
 version = "0.1.0"
 edition = "2021"
+license = "WTFPL"
+authors = ["Alina Chebakova"]
+description = "Telegram bot for searching Wikipedia articles with inline mode"
+repository = "https://github.com/username/wiki-article-finder-telegram"
 
 [dependencies]
 teloxide = { version = "0.12", features = ["macros"] }
