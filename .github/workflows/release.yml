@@ -9,37 +9,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  create-release:
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-    
-    steps:
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
-        body: |
-          Автоматический релиз Wiki Article Finder Telegram Bot
-          
-          ## Изменения
-          - Обновления и исправления ошибок
-          - Оптимизированные запросы к Wikipedia API
-          
-          ## Установка
-          1. Скачайте бинарный файл для вашей системы
-          2. Сделайте файл исполняемым: `chmod +x wiki-article-finder-telegram`
-          3. Создайте `.env` файл с `BOT_TOKEN=ваш_токен`
-          4. Запустите: `./wiki-article-finder-telegram`
-        draft: false
-        prerelease: false
-
   build-release:
-    needs: create-release
     strategy:
       matrix:
         os: [ubuntu-latest]
