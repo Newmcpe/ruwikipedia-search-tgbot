@@ -1754,7 +1754,7 @@ dependencies = [
 
 [[package]]
 name = "wiki-article-finder-telegram"
-version = "1.0.1"
+version = "1.1.0"
 dependencies = [
  "dotenv",
  "futures",

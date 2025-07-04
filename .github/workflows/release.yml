@@ -20,7 +20,7 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact_name: wiki-article-finder-telegram
+            artifact_name: wiki-article-finder-telegram-linux-x86_64
             asset_name: wiki-article-finder-telegram-linux-x86_64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
@@ -28,7 +28,7 @@ jobs:
             asset_name: wiki-article-finder-telegram-windows-x86_64.exe
           - os: macos-latest
             target: x86_64-apple-darwin
-            artifact_name: wiki-article-finder-telegram
+            artifact_name: wiki-article-finder-telegram-macos-x86_64
             asset_name: wiki-article-finder-telegram-macos-x86_64
 
     runs-on: ${{ matrix.os }}
