@@ -47,8 +47,7 @@ async fn inline_query_handler(bot: Bot, q: InlineQuery) -> ResponseResult<()> {
                         "no_results",
                         "Ничего не найдено",
                         InputMessageContent::Text(InputMessageContentText::new(format!(
-                            "По запросу \"{}\" ничего не найдено в русской Википедии",
-                            query
+                            "По запросу \"{query}\" ничего не найдено в русской Википедии"
                         ))),
                     )
                     .description("Попробуйте изменить запрос"),
@@ -134,7 +133,7 @@ async fn inline_query_handler(bot: Bot, q: InlineQuery) -> ResponseResult<()> {
                     );
 
                     let mut article_result = InlineQueryResultArticle::new(
-                        format!("article_{}", idx),
+                        format!("article_{idx}"),
                         &article.title,
                         InputMessageContent::Text(
                             InputMessageContentText::new(message_text)
@@ -159,8 +158,7 @@ async fn inline_query_handler(bot: Bot, q: InlineQuery) -> ResponseResult<()> {
                         "no_results",
                         "Ничего не найдено",
                         InputMessageContent::Text(InputMessageContentText::new(format!(
-                            "По запросу \"{}\" ничего не найдено в русской Википедии",
-                            query
+                            "По запросу \"{query}\" ничего не найдено в русской Википедии"
                         ))),
                     )
                     .description("Попробуйте изменить запрос"),
