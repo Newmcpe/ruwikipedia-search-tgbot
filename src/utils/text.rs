@@ -76,10 +76,8 @@ pub fn sanitize_search_query(query: &str) -> String {
         .map(|c| {
             if c.is_alphanumeric() || "-_".contains(c) {
                 c.to_string()
-            } else if c.is_whitespace() {
-                " ".to_string()
             } else {
-                " ".to_string() // Replace non-allowed chars with space
+                " ".to_string() // Replace whitespace and non-allowed chars with space
             }
         })
         .collect();
