@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use teloxide::{prelude::*, types::ParseMode};
-use tracing::{error, info, instrument};
+use tracing::error;
 
 use crate::utils::format_welcome_message;
 

@@ -43,10 +43,7 @@ pub fn truncate_string(text: &str, max_chars: usize) -> String {
 pub fn clean_description(text: &str) -> String {
     let cleaned = clean_html(text);
 
-    let cleaned = cleaned
-        .replace('\n', " ")
-        .replace('\r', " ")
-        .replace('\t', " ");
+    let cleaned = cleaned.replace(['\n', '\r', '\t'], " ");
 
     MULTIPLE_SPACES_REGEX
         .replace_all(&cleaned, " ")
@@ -57,7 +54,7 @@ pub fn clean_description(text: &str) -> String {
 pub fn extract_first_sentence(text: &str, max_length: usize) -> String {
     let cleaned = clean_description(text);
 
-    if let Some(end_pos) = cleaned.find(|c| matches!(c, '.' | '!' | '?')) {
+    if let Some(end_pos) = cleaned.find(['.', '!', '?']) {
         let sentence = &cleaned[..=end_pos];
         if sentence.len() <= max_length {
             return sentence.trim().to_string();

@@ -72,9 +72,7 @@ impl WikidataService {
             .await?;
 
         if !response.status().is_success() {
-            return Err(WikiError::Network(reqwest::Error::from(
-                response.error_for_status().unwrap_err(),
-            )));
+            return Err(WikiError::Network(response.error_for_status().unwrap_err()));
         }
 
         let wikidata_response: WikidataResponse = response.json().await?;

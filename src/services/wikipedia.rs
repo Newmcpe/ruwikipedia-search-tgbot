@@ -108,9 +108,7 @@ impl WikipediaService {
         let response = self.client.get(&url).query(&params).send().await?;
 
         if !response.status().is_success() {
-            return Err(WikiError::Network(reqwest::Error::from(
-                response.error_for_status().unwrap_err(),
-            )));
+            return Err(WikiError::Network(response.error_for_status().unwrap_err()));
         }
 
         let search_response: WikipediaSearchResponse = response.json().await?;
@@ -166,9 +164,7 @@ impl WikipediaService {
         let response = self.client.get(&url).query(&params).send().await?;
 
         if !response.status().is_success() {
-            return Err(WikiError::Network(reqwest::Error::from(
-                response.error_for_status().unwrap_err(),
-            )));
+            return Err(WikiError::Network(response.error_for_status().unwrap_err()));
         }
 
         let batch_response: WikipediaBatchResponse = response.json().await?;
@@ -255,9 +251,7 @@ impl WikipediaService {
         let response = self.client.get(&url).query(&params).send().await?;
 
         if !response.status().is_success() {
-            return Err(WikiError::Network(reqwest::Error::from(
-                response.error_for_status().unwrap_err(),
-            )));
+            return Err(WikiError::Network(response.error_for_status().unwrap_err()));
         }
 
         let unified_response: UnifiedWikipediaResponse = response.json().await?;

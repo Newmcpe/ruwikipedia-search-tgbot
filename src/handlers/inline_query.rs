@@ -6,7 +6,7 @@ use teloxide::{
         InputMessageContent, InputMessageContentText, ParseMode,
     },
 };
-use tracing::{error, info, instrument};
+use tracing::{error, info};
 
 use crate::config::languages::SupportedLanguage;
 use crate::errors::{UserFriendlyError, WikiError};
