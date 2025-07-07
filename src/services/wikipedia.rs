@@ -240,6 +240,7 @@ impl WikipediaService {
             ),
             ("exintro", "1"),
             ("explaintext", "1"),
+            ("exchars", "400"),
             ("exlimit", "max"),
             ("piprop", "thumbnail"),
             ("pithumbsize", "300"),
@@ -248,17 +249,72 @@ impl WikipediaService {
             ("cllimit", "10"),
         ];
 
+        tracing::info!("📡 Unified API запрос: {} для '{}'", url, query);
+
         let response = self.client.get(&url).query(&params).send().await?;
 
         if !response.status().is_success() {
             return Err(WikiError::Network(response.error_for_status().unwrap_err()));
         }
 
-        let unified_response: UnifiedWikipediaResponse = response.json().await?;
+        let response_text = response.text().await?;
+        let unified_response: UnifiedWikipediaResponse = serde_json::from_str(&response_text)?;
+
+        tracing::info!(
+            "📊 Получено {} страниц от unified API",
+            unified_response.query.pages.len()
+        );
 
         let mut enriched_articles = Vec::new();
+        let mut titles_without_extract = Vec::new();
 
-        for (_, page_info) in unified_response.query.pages {
+        // Сначала собираем все статьи и определяем какие нуждаются в fallback
+        let mut temp_articles = Vec::new();
+
+        for (page_id, page_info) in unified_response.query.pages {
+            tracing::debug!(
+                "🔍 Обрабатываю страницу: '{}' (ID: {})",
+                page_info.title,
+                page_id
+            );
+
+            let has_extract = page_info
+                .extract
+                .as_ref()
+                .is_some_and(|e| !e.trim().is_empty());
+
+            if !has_extract {
+                titles_without_extract.push(page_info.title.clone());
+                tracing::debug!(
+                    "❌ Extract отсутствует для '{}', добавляем в fallback",
+                    page_info.title
+                );
+            } else {
+                tracing::debug!(
+                    "✅ Extract найден для '{}': {} символов",
+                    page_info.title,
+                    page_info.extract.as_ref().unwrap().len()
+                );
+            }
+
+            temp_articles.push((page_id, page_info));
+        }
+
+        // Batch fallback для всех статей без extract
+        let fallback_snippets = if !titles_without_extract.is_empty() {
+            tracing::info!(
+                "🔄 Batch fallback для {} статей без extract",
+                titles_without_extract.len()
+            );
+            self.get_batch_search_snippets(&titles_without_extract, language)
+                .await
+                .unwrap_or_default()
+        } else {
+            std::collections::HashMap::new()
+        };
+
+        // Теперь создаем enriched articles
+        for (_page_id, page_info) in temp_articles {
             let image_url = page_info
                 .thumbnail
                 .as_ref()
@@ -287,15 +343,31 @@ impl WikipediaService {
 
             let batch_info = ArticleBatchInfo {
                 image_url,
-                extract: page_info.extract,
+                extract: page_info.extract.clone(),
                 wikidata_id,
                 coordinates,
                 categories,
             };
 
+            let snippet = if let Some(ref extract) = page_info.extract {
+                if !extract.trim().is_empty() {
+                    Self::create_snippet_from_extract(extract)
+                } else {
+                    fallback_snippets
+                        .get(&page_info.title)
+                        .cloned()
+                        .unwrap_or_else(|| page_info.title.clone())
+                }
+            } else {
+                fallback_snippets
+                    .get(&page_info.title)
+                    .cloned()
+                    .unwrap_or_else(|| page_info.title.clone())
+            };
+
             let basic_info = WikipediaSearchItem {
                 title: page_info.title.clone(),
-                snippet: String::new(),
+                snippet: snippet.clone(),
                 pageid: Some(page_info.pageid),
                 size: None,
                 wordcount: None,
@@ -310,6 +382,8 @@ impl WikipediaService {
 
             enriched_articles.push(enriched_article);
         }
+
+        tracing::info!("✅ Создано {} обогащенных статей", enriched_articles.len());
 
         enriched_articles.sort_by(|a, b| match (a.relevance_index, b.relevance_index) {
             (Some(idx_a), Some(idx_b)) => idx_a.cmp(&idx_b),
@@ -355,6 +429,87 @@ impl WikipediaService {
         }
 
         score
+    }
+
+    fn create_snippet_from_extract(extract: &str) -> String {
+        const MAX_SNIPPET_LENGTH: usize = 200;
+
+        if extract.len() <= MAX_SNIPPET_LENGTH {
+            return extract.to_string();
+        }
+
+        let mut result = String::with_capacity(MAX_SNIPPET_LENGTH);
+
+        for (char_count, ch) in extract.chars().enumerate() {
+            if char_count >= MAX_SNIPPET_LENGTH - 3 {
+                break;
+            }
+            result.push(ch);
+        }
+
+        if let Some(last_space) = result.rfind(' ') {
+            result.truncate(last_space);
+        }
+
+        result.push_str("...");
+        result
+    }
+
+    async fn get_batch_search_snippets(
+        &self,
+        titles: &[String],
+        language: SupportedLanguage,
+    ) -> WikiResult<std::collections::HashMap<String, String>> {
+        if titles.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+
+        let url = format!("https://{}.wikipedia.org/w/api.php", language.code());
+        let search_query = titles.join(" OR ");
+
+        let params = [
+            ("action", "query"),
+            ("list", "search"),
+            ("srsearch", &search_query),
+            ("format", "json"),
+            ("srlimit", &std::cmp::min(titles.len() * 2, 50).to_string()),
+            ("srprop", "snippet"),
+        ];
+
+        let response = self.client.get(&url).query(&params).send().await?;
+
+        if !response.status().is_success() {
+            return Err(WikiError::Network(response.error_for_status().unwrap_err()));
+        }
+
+        let search_response: WikipediaSearchResponse = response.json().await?;
+        let mut result = std::collections::HashMap::new();
+
+        for title in titles {
+            if let Some(article) = search_response
+                .query
+                .search
+                .iter()
+                .find(|a| a.title.to_lowercase() == title.to_lowercase())
+            {
+                let cleaned_snippet = clean_html(&article.snippet);
+                if !cleaned_snippet.trim().is_empty() {
+                    result.insert(title.clone(), cleaned_snippet);
+                    tracing::debug!(
+                        "🔄 Найден snippet для '{}': {} символов",
+                        title,
+                        result[title].len()
+                    );
+                }
+            }
+        }
+
+        tracing::info!(
+            "🔄 Batch search получил {} snippet'ов из {} запрошенных",
+            result.len(),
+            titles.len()
+        );
+        Ok(result)
     }
 }
 
@@ -533,10 +688,10 @@ mod tests {
         let key1 = service.search_cache_key("test", SupportedLanguage::English);
         let key2 = service.search_cache_key("Test", SupportedLanguage::English);
 
-        assert_eq!(key1, key2); // Должны быть одинаковыми (case-insensitive)
+        assert_eq!(key1, key2);
 
         let key3 = service.search_cache_key("test", SupportedLanguage::Russian);
-        assert_ne!(key1, key3); // Разные языки
+        assert_ne!(key1, key3);
     }
 
     #[test]
@@ -553,5 +708,24 @@ mod tests {
             url_ru,
             "https://ru.wikipedia.org/wiki/%D0%A2%D0%B5%D1%81%D1%82"
         );
+    }
+
+    #[test]
+    fn test_create_snippet_from_extract() {
+        let short_extract = "Короткий текст.";
+        let snippet = WikipediaService::create_snippet_from_extract(short_extract);
+        assert_eq!(snippet, "Короткий текст.");
+
+        let simple_long = "A".repeat(250);
+        let snippet = WikipediaService::create_snippet_from_extract(&simple_long);
+        println!("Simple long snippet length: {}", snippet.len());
+        assert!(snippet.len() <= 200);
+        assert!(snippet.ends_with("..."));
+
+        let text_with_spaces = "word ".repeat(50);
+        let snippet = WikipediaService::create_snippet_from_extract(&text_with_spaces);
+        println!("Spaces text snippet length: {}", snippet.len());
+        assert!(snippet.len() <= 200);
+        assert!(snippet.ends_with("..."));
     }
 }

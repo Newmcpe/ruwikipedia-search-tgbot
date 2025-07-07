@@ -151,6 +151,11 @@ impl InlineQueryHandler {
         mut enriched_articles: Vec<EnrichedArticle>,
         wikidata_descriptions: std::collections::HashMap<String, String>,
     ) -> Vec<InlineQueryResult> {
+        tracing::debug!(
+            "🏗️ Строим результаты для {} статей",
+            enriched_articles.len()
+        );
+
         enriched_articles.sort_by(|a, b| match (a.relevance_index, b.relevance_index) {
             (Some(idx_a), Some(idx_b)) => idx_a.cmp(&idx_b),
             (Some(_), None) => std::cmp::Ordering::Less,
@@ -207,6 +212,7 @@ impl InlineQueryHandler {
             results.push(InlineQueryResult::Article(article_result));
         }
 
+        tracing::info!("✅ Создано {} inline результатов", results.len());
         results
     }
 

@@ -58,12 +58,8 @@ impl EnrichedArticle {
     }
 
     pub fn best_description(&self, max_length: usize) -> String {
-        if let Some(ref wikidata_desc) = self.wikidata_description {
-            if !wikidata_desc.trim().is_empty() {
-                return truncate_string(wikidata_desc, max_length);
-            }
-        }
-
+        // Всегда используем текст статьи для краткого описания для консистентности
+        // Wikidata описание доступно через self.wikidata_description если нужно отдельно
         if let Some(ref batch_info) = self.batch_info {
             if let Some(ref extract) = batch_info.extract {
                 if !extract.trim().is_empty() {
@@ -72,7 +68,18 @@ impl EnrichedArticle {
             }
         }
 
-        truncate_string(&self.basic_info.snippet, max_length)
+        // Fallback на snippet из search API
+        if !self.basic_info.snippet.trim().is_empty() {
+            return truncate_string(&self.basic_info.snippet, max_length);
+        }
+
+        // Последний fallback - название статьи
+        format!("Статья из Википедии: {}", self.basic_info.title)
+    }
+
+    /// Получить Wikidata описание если доступно
+    pub fn get_wikidata_description(&self) -> Option<&str> {
+        self.wikidata_description.as_deref()
     }
 
     pub fn best_content(&self, max_length: usize) -> String {
@@ -271,6 +278,6 @@ mod tests {
             "http://example.com".to_string(),
         );
 
-        assert_eq!(article.best_description(100), "Best description");
+        assert_eq!(article.best_description(100), "Better extract");
     }
 }
