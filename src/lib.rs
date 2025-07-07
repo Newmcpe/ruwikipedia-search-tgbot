@@ -25,7 +25,7 @@ pub fn init_logging(config: &config::LoggingConfig) -> Result<(), WikiError> {
                 .with(tracing_subscriber::fmt::layer().json())
                 .try_init()
                 .map_err(|e| {
-                    WikiError::config(format!("Failed to initialize JSON logging: {}", e))
+                    WikiError::config(format!("Failed to initialize JSON logging: {e}"))
                 })?;
         }
         config::LogFormat::Pretty => {
@@ -44,7 +44,7 @@ pub fn init_logging(config: &config::LoggingConfig) -> Result<(), WikiError> {
                 )
                 .try_init()
                 .map_err(|e| {
-                    WikiError::config(format!("Failed to initialize pretty logging: {}", e))
+                    WikiError::config(format!("Failed to initialize pretty logging: {e}"))
                 })?;
         }
         config::LogFormat::Compact => {
@@ -63,7 +63,7 @@ pub fn init_logging(config: &config::LoggingConfig) -> Result<(), WikiError> {
                 )
                 .try_init()
                 .map_err(|e| {
-                    WikiError::config(format!("Failed to initialize compact logging: {}", e))
+                    WikiError::config(format!("Failed to initialize compact logging: {e}"))
                 })?;
         }
     }

@@ -53,7 +53,7 @@ impl WikipediaService {
             .timeout(config.http_timeout())
             .user_agent(&config.wikipedia.user_agent)
             .build()
-            .map_err(|e| WikiError::internal(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| WikiError::internal(format!("Failed to create HTTP client: {e}")))?;
 
         let search_cache = Cache::builder()
             .time_to_live(config.cache_ttl())

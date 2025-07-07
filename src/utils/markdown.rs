@@ -3,7 +3,7 @@ pub fn escape_markdown(text: &str) -> String {
         .map(|c| match c {
             '_' | '*' | '[' | ']' | '(' | ')' | '~' | '`' | '>' | '#' | '+' | '-' | '=' | '|'
             | '{' | '}' | '.' | '!' => {
-                format!("\\{}", c)
+                format!("\\{c}")
             }
             _ => c.to_string(),
         })
@@ -13,7 +13,7 @@ pub fn escape_markdown(text: &str) -> String {
 pub fn escape_markdown_url(url: &str) -> String {
     url.chars()
         .map(|c| match c {
-            ')' | '\\' => format!("\\{}", c),
+            ')' | '\\' => format!("\\{c}"),
             _ => c.to_string(),
         })
         .collect()

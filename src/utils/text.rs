@@ -37,7 +37,7 @@ pub fn truncate_string(text: &str, max_chars: usize) -> String {
         truncated.truncate(last_space);
     }
 
-    format!("{}...", truncated)
+    format!("{truncated}...")
 }
 
 pub fn clean_description(text: &str) -> String {

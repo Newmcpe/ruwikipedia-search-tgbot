@@ -66,9 +66,9 @@ impl UserFriendlyError for WikiError {
             WikiError::Parse(_) => "⚠️ Ошибка обработки данных от Wikipedia.".to_string(),
             WikiError::UrlParse(_) => "🔗 Неверный формат ссылки.".to_string(),
             WikiError::NoResults { query } => {
-                format!("🔍 По запросу \"{}\" ничего не найдено.", query)
+                format!("🔍 По запросу \"{query}\" ничего не найдено.")
             }
-            WikiError::InvalidLanguage { code } => format!("🌍 Язык '{}' не поддерживается.", code),
+            WikiError::InvalidLanguage { code } => format!("🌍 Язык '{code}' не поддерживается."),
             WikiError::Timeout => "⏱️ Превышено время ожидания. Попробуйте позже.".to_string(),
             WikiError::UnexpectedApiResponse => {
                 "📡 Неожиданный ответ от Wikipedia API.".to_string()

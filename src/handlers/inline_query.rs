@@ -37,7 +37,7 @@ impl InlineQueryHandler {
             .from
             .username
             .as_ref()
-            .map(|u| format!("@{}", u))
+            .map(|u| format!("@{u}"))
             .unwrap_or_else(|| format!("ID:{}", q.from.id));
 
         if !query.is_empty() {
@@ -192,7 +192,7 @@ impl InlineQueryHandler {
             );
 
             let mut article_result = InlineQueryResultArticle::new(
-                format!("article_{}", idx),
+                format!("article_{idx}"),
                 &article.basic_info.title,
                 InputMessageContent::Text(
                     InputMessageContentText::new(message_text).parse_mode(ParseMode::MarkdownV2),
