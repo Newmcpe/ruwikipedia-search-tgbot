@@ -526,6 +526,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cache_key_generation() {
+        std::env::set_var("BOT_TOKEN", "test_token_123");
         let config = AppConfig::from_env().unwrap();
         let service = WikipediaService::new(config).unwrap();
 
@@ -540,6 +541,7 @@ mod tests {
 
     #[test]
     fn test_get_article_url() {
+        std::env::set_var("BOT_TOKEN", "test_token_123");
         let config = AppConfig::from_env().unwrap();
         let service = WikipediaService::new(config).unwrap();
 

@@ -8,7 +8,7 @@ static MULTIPLE_SPACES_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\s+").expect("Failed to compile multiple spaces regex"));
 
 pub fn clean_html(text: &str) -> String {
-    let text = HTML_TAG_REGEX.replace_all(text, " ");
+    let text = HTML_TAG_REGEX.replace_all(text, "");
     let text = decode_html_entities(&text);
     let text = MULTIPLE_SPACES_REGEX.replace_all(&text, " ");
     text.trim().to_string()
@@ -71,11 +71,22 @@ pub fn normalize_whitespace(text: &str) -> String {
 }
 
 pub fn sanitize_search_query(query: &str) -> String {
-    query
+    let result: String = query
         .chars()
-        .filter(|c| c.is_alphanumeric() || c.is_whitespace() || "-_".contains(*c))
-        .collect::<String>()
-        .trim()
+        .map(|c| {
+            if c.is_alphanumeric() || "-_".contains(c) {
+                c.to_string()
+            } else if c.is_whitespace() {
+                " ".to_string()
+            } else {
+                " ".to_string() // Replace non-allowed chars with space
+            }
+        })
+        .collect();
+
+    // Only normalize spaces at the beginning/end and multiple consecutive spaces
+    MULTIPLE_SPACES_REGEX
+        .replace_all(result.trim(), " ")
         .to_string()
 }
 
@@ -140,7 +151,7 @@ mod tests {
         assert_eq!(sanitize_search_query("normal query"), "normal query");
         assert_eq!(
             sanitize_search_query("query with @#$% symbols"),
-            "query with  symbols"
+            "query with symbols"
         );
         assert_eq!(sanitize_search_query("  spaced  query  "), "spaced query");
     }
