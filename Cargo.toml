@@ -19,7 +19,7 @@ dotenv = "0.15"
 futures = "0.3.31"
 
 # Error handling
-thiserror = "1.0"
+thiserror = "2.0"
 
 # Caching
 moka = { version = "0.12", features = ["future"] }
